@@ -9,41 +9,55 @@
 #include <sqlite3.h>
 
 using namespace std;
+
+static int user_check(void *fn, int num, char **data, char **column)
+{
+    int *flag = (int *)fn;
+
+    if (stoi(data[0]) == 1)
+    {
+        *flag = true;
+    }
+    else
+    {
+        *flag = false;
+    }
+
+    return 0;
+}
+
+#define backup "backup.db"
+#define datadb "database.db"
+
 int main()
 {
 
-    // check backup file exists
-    if (filesystem::exists("backup.txt"))
+    sqlite3 *database;
+    if (filesystem::exists(datadb))
     {
-        // remove and replace backup to database
-        filesystem::remove("database.txt");
-        filesystem::copy("backup.txt","database.txt");
-    }else {
-        // backup from database
-        filesystem::copy("database.txt","backup.txt");
+        sqlite3_open(datadb, &database);
     }
-    
+    else
+    {
+        sqlite3_open(datadb, &database);
+        sqlite3_exec(database, "CREATE TABLE 'users' ('name' TEXT,'time' INTEGER);", NULL, NULL, NULL);
+    }
+
+    // // check backup file exists
+    // if (filesystem::exists(backup))
+    // {
+    //     // remove and replace backup to database
+    //     filesystem::remove(datadb);
+    //     filesystem::copy(backup, datadb);
+    // }
+    // else
+    // {
+    //     // backup from database
+    //     filesystem::copy(datadb, backup);
+    // }
 
     // clear termianl
     system("clear");
-
-    ifstream database;
-    database.open("database.txt");
-
-    // usernames and time unix list
-    vector<string> usernames;
-    vector<string> unixs;
-
-    string data;
-    while (getline(database, data))
-    {
-        string username = data.substr(0, data.find(":"));
-        string date_unix = data.erase(0, data.find(":") + 1);
-        usernames.push_back(username);
-        unixs.push_back(date_unix);
-    }
-
-    database.close();
 
     cout << "1 - Add user" << endl;
     cout << "2 - Charge user" << endl;
@@ -68,35 +82,24 @@ int main()
         int day;
         cin >> day;
 
-        ofstream database_w("database.txt");
-
         int custom_unix = time(nullptr) + (86400 * day);
 
-        bool exist = false;
-        for (size_t i = 0; i < usernames.size(); i++)
+        bool user_exist;
+        string user_query = "SELECT COUNT(*) FROM users WHERE name='" + username + "'";
+        sqlite3_exec(database, user_query.c_str(), user_check, &user_exist, NULL);
+
+        if (user_exist)
         {
-            string uname = usernames[i];
-            int utime = stoi(unixs[i]);
-
-            if (uname == username)
-            {
-                exist = true;
-            }
-
-            database_w << uname << ":" << utime << "\n";
-        }
-
-        if (exist == true)
-        {
-            cout << "User Has Exist" << endl;
+            cout << "\033[1;31mUser Has Exists\033[0m" << endl;
             return 0;
         }
 
-        database_w << username << ":" << custom_unix << "\n";
+        string query = "INSERT INTO users VALUES('" + username + "'," + to_string(custom_unix) + ")";
+        sqlite3_exec(database, query.c_str(), NULL, NULL, NULL);
+
         string command = "echo ";
         command.append(password + " | sudo ocpasswd -c /etc/ocserv/ocpasswd " + username);
         system(command.c_str());
-        database_w.close();
         cout << "User added" << endl;
     }
     if (input_main == 2)
@@ -111,39 +114,26 @@ int main()
 
         int custom_unix = time(nullptr) + (86400 * day);
 
-        ofstream database_w("database.txt");
+        bool user_exist;
+        string user_query = "SELECT COUNT(*) FROM users WHERE name='" + username + "'";
+        sqlite3_exec(database, user_query.c_str(), user_check, &user_exist, NULL);
 
-        bool exist;
-
-        for (size_t i = 0; i < usernames.size(); i++)
+        if (user_exist == false)
         {
-            string uname = usernames[i];
-            int utime = stoi(unixs[i]);
-
-            if (uname != username)
-            {
-                database_w << uname << ":" << utime << "\n";
-            }
-            else
-            {
-                database_w << uname << ":" << custom_unix << "\n";
-                exist = true;
-            }
+            cout << "\033[1;31mUser Not Exists\033[0m" << endl;
+            return 0;
         }
 
-        if (exist == true)
-        {
-            cout << "User Charged" << endl;
-            string command = "sudo ocpasswd -c /etc/ocserv/ocpasswd --unlock ";
-            command.append(username);
-            system(command.c_str());
-            database_w.close();
-        }
-        else
-        {
-            cout << "User not found" << endl;
-        }
+        string query = "UPDATE users SET time=" + to_string(custom_unix) + " WHERE name='" + username + "'";
+        sqlite3_exec(database, query.c_str(), NULL, NULL, NULL);
+
+        cout << "User Charged" << endl;
+        string command = "sudo ocpasswd -c /etc/ocserv/ocpasswd --unlock ";
+        command.append(username);
+        system(command.c_str());
     }
 
-    filesystem::remove("backup.txt");
+    sqlite3_close(database);
+
+    // filesystem::remove(backup);
 }
