@@ -43,19 +43,6 @@ int main()
         sqlite3_exec(database, "CREATE TABLE 'users' ('name' TEXT,'time' INTEGER);", NULL, NULL, NULL);
     }
 
-    // // check backup file exists
-    // if (filesystem::exists(backup))
-    // {
-    //     // remove and replace backup to database
-    //     filesystem::remove(datadb);
-    //     filesystem::copy(backup, datadb);
-    // }
-    // else
-    // {
-    //     // backup from database
-    //     filesystem::copy(datadb, backup);
-    // }
-
     // clear termianl
     system("clear");
 
@@ -135,5 +122,4 @@ int main()
 
     sqlite3_close(database);
 
-    // filesystem::remove(backup);
 }
